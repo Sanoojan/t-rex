@@ -76,7 +76,7 @@ class FGVCAircraft(torchvision.datasets.VisionDataset):
         targets = []
         with open(classes_file, 'r') as f:
             for line in f:
-                split_line = line.split(' ')
+                split_line = line.strip().split(' ')
                 image_ids.append(split_line[0])
                 targets.append(' '.join(split_line[1:]))
 
