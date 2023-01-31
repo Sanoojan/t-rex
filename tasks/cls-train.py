@@ -75,44 +75,44 @@ def getDatasetSelection():
     carsdata_path =  "/apps/local/shared/CV703/datasets/stanford_cars/"
 
     if cfg.dataset == "air":
-        trainloader, tclass_idx = ClsData.getAircraftsLoader( aircraftsdata_path,
+        trainloader, train_info = ClsData.getAircraftsLoader( aircraftsdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="train" )
-        validloader, vclass_idx = ClsData.getAircraftsLoader( aircraftsdata_path,
+        validloader, valid_info = ClsData.getAircraftsLoader( aircraftsdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="valid" )
     elif cfg.dataset == "car":
-        trainloader, tclass_idx = ClsData.getCarsLoader( carsdata_path,
+        trainloader, train_info = ClsData.getCarsLoader( carsdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="train" )
-        validloader, vclass_idx = ClsData.getCarsLoader(carsdata_path,
+        validloader, valid_info = ClsData.getCarsLoader(carsdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="valid" )
 
     elif cfg.dataset == "food":
-        trainloader, tclass_idx = ClsData.getFoodxLoader( foodxdata_path,
+        trainloader, train_info = ClsData.getFoodxLoader( foodxdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="train" )
-        validloader, vclass_idx = ClsData.getFoodxLoader( foodxdata_path,
+        validloader, valid_info = ClsData.getFoodxLoader( foodxdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="valid" )
 
     elif cfg.dataset == "air+car":
-        trainloader, tclass_idx = ClsData.getAircraftsAndCarsLoader(
+        trainloader, train_info = ClsData.getAircraftsAndCarsLoader(
                             [aircraftsdata_path, carsdata_path],
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="train" )
-        validloader, vclass_idx = ClsData.getAircraftsAndCarsLoader(
+        validloader, valid_info = ClsData.getAircraftsAndCarsLoader(
                             [aircraftsdata_path, carsdata_path],
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="valid" )
     else:
         raise ValueError("Unknown Dataset indicator set")
 
-    lutl.LOG2DICTXT(["Train-",tclass_idx], cfg.gLogPath +'/misc.txt')
-    lutl.LOG2DICTXT(["Valid-", vclass_idx], cfg.gLogPath +'/misc.txt')
+    lutl.LOG2DICTXT(["Train-",train_info], cfg.gLogPath +'/misc.txt')
+    lutl.LOG2DICTXT(["Valid-", valid_info], cfg.gLogPath +'/misc.txt')
 
-    return trainloader, validloader, len(tclass_idx)
+    return trainloader, validloader, len(train_info["Classes"])
 
 
 def simple_main():

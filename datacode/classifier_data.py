@@ -2,16 +2,16 @@ import os, sys, time
 import random
 import numpy as np
 import pandas as pd
-import scipy.io 
+import scipy.io
 from PIL import Image
 
 import torch
 import torchvision
 import torchvision.transforms as transforms
 from torchvision.datasets.folder import default_loader as tv_image_loader
-from torch.utils.data import ConcatDataset 
+from torch.utils.data import ConcatDataset
 
-## ===================== Dataset Classes ======================================= 
+## ===================== Dataset Classes =======================================
 
 class FGVCAircraft(torchvision.datasets.VisionDataset):
     """
@@ -25,14 +25,14 @@ class FGVCAircraft(torchvision.datasets.VisionDataset):
         target_transform (callable, optional): A function/transform that takes in the
             target and transforms it.
     """
-    
+
     class_types = ('variant', 'family', 'manufacturer')
     splits = ('train', 'val', 'trainval', 'test')
 
     def __init__(self, data_dir, class_type='variant', mode = "train", offset_class = 0,
                     transform=None, target_transform=None):
         super(FGVCAircraft, self).__init__(data_dir, transform=transform, target_transform=target_transform)
-        
+
         if mode == "train": split = "trainval"
         elif mode == "valid": split = "test"
         if split not in self.splits:
@@ -174,8 +174,8 @@ class FoodXDataset(torch.utils.data.Dataset):
         csv_path = f'{data_dir}/annot/{split}_info.csv'
         dataframe = pd.read_csv(csv_path, names= ['image_name','label'])
         dataframe['path'] = dataframe['image_name'].map(lambda x: os.path.join(image_folder, x))
-        
-        self.offset_class = offset_class 
+
+        self.offset_class = offset_class
         class_list =[ ls.strip().split(" ") for ls in open(f"{data_dir}/annot/class_list.txt").readlines()]
         self.class_to_idx = { l[1]: int(l[0])+self.offset_class for l in class_list}
 
@@ -220,11 +220,14 @@ class ClassifyTransforms:
             transforms.ToTensor(),
         ])
 
-        self.transform = infer_transform if infer else train_transform 
+        self.transform = infer_transform if infer else train_transform
 
     def __call__(self, x):
         y = self.transform(x)
         return y
+
+    def get_composition(self):
+        return self.transform
 
 
 class DinoTransforms:
@@ -281,13 +284,17 @@ def getAircraftsLoader(folder, batch_size, workers=2, type_ = 'train'):
     data_transform = ClassifyTransforms(infer_flag)
     dataset = FGVCAircraft(data_dir=folder, mode=type_,
                     transform=data_transform)
-    
-    cls_idx = dataset.class_to_idx
-    loader = torch.utils.data.DataLoader( dataset, 
+
+    loader = torch.utils.data.DataLoader( dataset,
         batch_size=batch_size, num_workers=workers, shuffle=shuffle_flag,
         pin_memory=True)
 
-    return loader, cls_idx
+    data_info = {"type": type_,
+                "Classes": dataset.class_to_idx ,
+                "DatasetSize": dataset.__len__(),
+                "Transforms": str(data_transform.get_composition()) }
+
+    return loader, data_info
 
 
 def getCarsLoader(folder, batch_size, workers=2, type_ = 'train'):
@@ -298,19 +305,23 @@ def getCarsLoader(folder, batch_size, workers=2, type_ = 'train'):
     data_transform = ClassifyTransforms(infer_flag)
     dataset = StanfordCars(data_dir=folder, mode=type_,
                     transform=data_transform)
-    
-    cls_idx = dataset.class_to_idx
-    loader = torch.utils.data.DataLoader( dataset, 
+
+    loader = torch.utils.data.DataLoader( dataset,
         batch_size=batch_size, num_workers=workers, shuffle=shuffle_flag,
         pin_memory=True)
 
-    return loader, cls_idx
+    data_info = {"type": type_,
+                "Classes": dataset.class_to_idx ,
+                "DatasetSize": dataset.__len__(),
+                "Transforms": str(data_transform.get_composition()) }
+
+    return loader, data_info
 
 
 def getAircraftsAndCarsLoader(folders, batch_size, workers=2, type_ = 'train'):
     """ folders: [0] Aircrafts data path [1] Stanford cars data path
     """
-    if not isinstance(folders, list) or len(folders)!=2: 
+    if not isinstance(folders, list) or len(folders)!=2:
         raise ValueError("Requires Two folders path for concatenation")
 
     infer_flag = False; shuffle_flag = True
@@ -324,16 +335,21 @@ def getAircraftsAndCarsLoader(folders, batch_size, workers=2, type_ = 'train'):
     car_dataset = StanfordCars(data_dir=folders[1], mode=type_,
                     offset_class=len(air_dataset.class_to_idx),
                     transform=data_transform )
-    
+
     dataset = ConcatDataset([air_dataset, car_dataset])
 
     cls_idx = dict(list(air_dataset.class_to_idx.items()) +  \
                     list(car_dataset.class_to_idx.items())) #union operation
-    loader = torch.utils.data.DataLoader( dataset, 
+    loader = torch.utils.data.DataLoader( dataset,
         batch_size=batch_size, num_workers=workers, shuffle=shuffle_flag,
         pin_memory=True)
 
-    return loader, cls_idx
+    data_info = {"type": type_,
+                "Classes": dataset.class_to_idx ,
+                "DatasetSize": dataset.__len__(),
+                "Transforms": str(data_transform.get_composition()) }
+
+    return loader, data_info
 
 
 def getFoodxLoader(folder, batch_size, workers=2, type_ = 'train'):
@@ -344,13 +360,17 @@ def getFoodxLoader(folder, batch_size, workers=2, type_ = 'train'):
     data_transform = ClassifyTransforms(infer_flag)
     dataset = FoodXDataset(data_dir=folder, mode=type_,
                     transform=data_transform)
-    
-    cls_idx = dataset.class_to_idx
-    loader = torch.utils.data.DataLoader( dataset, 
+
+    loader = torch.utils.data.DataLoader( dataset,
         batch_size=batch_size, num_workers=workers, shuffle=shuffle_flag,
         pin_memory=True)
 
-    return loader, cls_idx
+    data_info = {"type": type_,
+                "Classes": dataset.class_to_idx ,
+                "DatasetSize": dataset.__len__(),
+                "Transforms": str(data_transform.get_composition()) }
+
+    return loader, data_info
 
 
 ##========================= DatasetChecking ====================================
@@ -377,7 +397,7 @@ if __name__ == "__main__":
         transforms.Resize((512, 512)),
         transforms.ToTensor(),
         ## Avoid using below for visualization
-        # transforms.Normalize(mean=(0.485, 0.456, 0.406), 
+        # transforms.Normalize(mean=(0.485, 0.456, 0.406),
         #                     std=(0.229, 0.224, 0.225))
     ])
 
@@ -393,7 +413,7 @@ if __name__ == "__main__":
                     transform=data_transform)
 
 
-    dataloader,_ = getAircraftsAndCarsLoader([aircraftdata, carsdata], 
+    dataloader,_ = getAircraftsAndCarsLoader([aircraftdata, carsdata],
                     batch_size=1, type_="train")
 
     imgs = []; tgts = []
@@ -404,11 +424,11 @@ if __name__ == "__main__":
         img = img.squeeze()
         imgs.append(img)
         tgts.append(tgt)
-        
-    show_loaded_imgs(imgs)
-    
 
-    
+    show_loaded_imgs(imgs)
+
+
+
 
 
 
