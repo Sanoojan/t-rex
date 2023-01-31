@@ -21,7 +21,7 @@ import utilities.runUtils as rutl
 import utilities.logUtils as lutl
 from utilities.metricUtils import MultiClassMetrics
 from algorithms.resnet import ClassifierNet
-import datacode.classifier_data as ClsData  
+import datacode.classifier_data as ClsData
 
 
 print(f"Pytorch version: {torch.__version__}")
@@ -38,16 +38,16 @@ balance_class = False, #to be implemented
 epochs= 1000,
 batch_size= 64,
 workers= 4,
-learning_rate= 0.2,
+learning_rate= 1e-4,
 weight_decay= 1e-6,
 
-feature_extract = "resnet18", # "resnet34/50/101"
-featx_pretrain =  "DEFAULT",  # path-to-weights or None or DEFAULT-->imagenet
+feature_extract = "resnet50", # "resnet34/50/101"
+featx_pretrain = "DEFAULT",  # path-to-weights or None or DEFAULT-->imagenet
 featx_dropout = 0.0,
-classifier = [512,], #First & Last MLPs will be set in code based on class out of dataset and FeatureExtractor
+classifier = [1024,], #First & Last MLPs will be set in code based on class out of dataset and FeatureExtractor
 clsfy_dropout = 0.5,
 
-checkpoint_dir= "hypotheses/dummypth1/",
+checkpoint_dir= "hypotheses/res50-air/",
 restart_training=False
 )
 
@@ -75,35 +75,35 @@ def getDatasetSelection():
     carsdata_path =  "/apps/local/shared/CV703/datasets/stanford_cars/"
 
     if cfg.dataset == "air":
-        trainloader, tclass_idx = ClsData.getAircraftsLoader( aircraftsdata_path, 
+        trainloader, tclass_idx = ClsData.getAircraftsLoader( aircraftsdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="train" )
-        validloader, vclass_idx = ClsData.getAircraftsLoader( aircraftsdata_path, 
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="valid" )    
-    elif cfg.dataset == "car":
-        trainloader, tclass_idx = ClsData.getCarsLoader( carsdata_path, 
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="train" )
-        validloader, vclass_idx = ClsData.getCarsLoader(carsdata_path, 
+        validloader, vclass_idx = ClsData.getAircraftsLoader( aircraftsdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="valid" )
-    
+    elif cfg.dataset == "car":
+        trainloader, tclass_idx = ClsData.getCarsLoader( carsdata_path,
+                            batch_size=cfg.batch_size, workers =cfg.workers,
+                            type_="train" )
+        validloader, vclass_idx = ClsData.getCarsLoader(carsdata_path,
+                            batch_size=cfg.batch_size, workers =cfg.workers,
+                            type_="valid" )
+
     elif cfg.dataset == "food":
         trainloader, tclass_idx = ClsData.getFoodxLoader( foodxdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="train" )
-        validloader, vclass_idx = ClsData.getFoodxLoader( foodxdata_path, 
+        validloader, vclass_idx = ClsData.getFoodxLoader( foodxdata_path,
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="valid" )
 
     elif cfg.dataset == "air+car":
-        trainloader, tclass_idx = ClsData.getAircraftsAndCarsLoader( 
-                            [aircraftsdata_path, carsdata_path], 
+        trainloader, tclass_idx = ClsData.getAircraftsAndCarsLoader(
+                            [aircraftsdata_path, carsdata_path],
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="train" )
-        validloader, vclass_idx = ClsData.getAircraftsAndCarsLoader( 
-                            [aircraftsdata_path, carsdata_path], 
+        validloader, vclass_idx = ClsData.getAircraftsAndCarsLoader(
+                            [aircraftsdata_path, carsdata_path],
                             batch_size=cfg.batch_size, workers =cfg.workers,
                             type_="valid" )
     else:
@@ -132,7 +132,7 @@ def simple_main():
 
 
     ### DATA ACCESS
-    trainloader, validloader, class_size  = getDatasetSelection() 
+    trainloader, validloader, class_size  = getDatasetSelection()
     cfg.classifier.append(class_size) #Adding last layer of MLP
 
     ### MODEL, OPTIM
