@@ -20,7 +20,9 @@ sys.path.append(os.getcwd())
 import utilities.runUtils as rutl
 import utilities.logUtils as lutl
 from utilities.metricUtils import MultiClassMetrics
-from algorithms.resnet import ClassifierNet
+# from algorithms.resnet import ClassifierNet
+from algorithms.convnext import ClassifierNet
+
 import datacode.classifier_data as ClsData
 
 
@@ -29,7 +31,7 @@ print(f"cuda version: {torch.version.cuda}")
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print("Device Used:", device)
 
-###============================= Configure and Setup ===========================
+##============================= Configure and Setup ============================
 
 cfg = rutl.ObjDict(
 dataset = "air", # "air+car", "food", "car"

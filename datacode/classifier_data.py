@@ -338,14 +338,14 @@ def getAircraftsAndCarsLoader(folders, batch_size, workers=2, type_ = 'train'):
 
     dataset = ConcatDataset([air_dataset, car_dataset])
 
-    cls_idx = dict(list(air_dataset.class_to_idx.items()) +  \
+    class_to_idx = dict(list(air_dataset.class_to_idx.items()) +  \
                     list(car_dataset.class_to_idx.items())) #union operation
     loader = torch.utils.data.DataLoader( dataset,
         batch_size=batch_size, num_workers=workers, shuffle=shuffle_flag,
         pin_memory=True)
 
     data_info = {"type": type_,
-                "Classes": dataset.class_to_idx ,
+                "Classes": class_to_idx ,
                 "DatasetSize": dataset.__len__(),
                 "Transforms": str(data_transform.get_composition()) }
 
