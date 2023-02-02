@@ -1,7 +1,9 @@
-import os
+import os, sys
 import torch
 import torchvision
 from torch import nn
+
+sys.path.append(os.getcwd())
 import utilities.runUtils as rutl
 import utilities.logUtils as lutl
 
@@ -104,4 +106,9 @@ class ClassifierNet(nn.Module):
         return model
 
 
+if __name__ == "__main__":
 
+    from torchsummary import summary
+
+    model = torchvision.models.resnet50()
+    summary(model, (3, 224, 224))
