@@ -1,29 +1,28 @@
 """ Classifier Network trainig
 """
 
+import os, sys, time
 import argparse
 import json
-import math
-import os
-import random
-import signal
-import subprocess
-import sys
-import time
+import random, math
+import signal, subprocess
 
 from tqdm.autonotebook import tqdm
 import PIL.Image
-from torch import nn, optim
+
 import torch
+from torch import nn, optim
+import timm.loss
 
 sys.path.append(os.getcwd())
 import utilities.runUtils as rutl
 import utilities.logUtils as lutl
 from utilities.metricUtils import MultiClassMetrics
+
 # from algorithms.resnet import ClassifierNet
 from algorithms.convnext import ClassifierNet
 
-import datacode.classifier_data as ClsData
+from datacode.classifier_data import SimplifiedLoader
 
 
 print(f"Pytorch version: {torch.__version__}")
@@ -42,6 +41,7 @@ batch_size= 64,
 workers= 4,
 learning_rate= 1e-4,
 weight_decay= 1e-6,
+augument= "DEFAULT", #DEFAULT or AUGMIX
 
 feature_extract = "resnet50", # "resnet34/50/101"
 featx_pretrain = "DEFAULT",  # path-to-weights or None or DEFAULT-->imagenet
@@ -72,49 +72,29 @@ cfg.gWeightPath = cfg.checkpoint_dir + '/weights/'
 
 
 def getDatasetSelection():
-    aircraftsdata_path = "/apps/local/shared/CV703/datasets/fgvc-aircraft-2013b/"
-    foodxdata_path =  "/apps/local/shared/CV703/datasets/FoodX/food_dataset/"
-    carsdata_path =  "/apps/local/shared/CV703/datasets/stanford_cars/"
 
-    if cfg.dataset == "air":
-        trainloader, train_info = ClsData.getAircraftsLoader( aircraftsdata_path,
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="train" )
-        validloader, valid_info = ClsData.getAircraftsLoader( aircraftsdata_path,
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="valid" )
-    elif cfg.dataset == "car":
-        trainloader, train_info = ClsData.getCarsLoader( carsdata_path,
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="train" )
-        validloader, valid_info = ClsData.getCarsLoader(carsdata_path,
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="valid" )
+    loaderObj = SimplifiedLoader("air")
+    trainloader, train_info = loaderObj.getDataLoader(type_= "train", 
+                    batch_size=cfg.batch_size, workers=cfg.workers, 
+                    augument= cfg.augument)
 
-    elif cfg.dataset == "food":
-        trainloader, train_info = ClsData.getFoodxLoader( foodxdata_path,
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="train" )
-        validloader, valid_info = ClsData.getFoodxLoader( foodxdata_path,
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="valid" )
-
-    elif cfg.dataset == "air+car":
-        trainloader, train_info = ClsData.getAircraftsAndCarsLoader(
-                            [aircraftsdata_path, carsdata_path],
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="train" )
-        validloader, valid_info = ClsData.getAircraftsAndCarsLoader(
-                            [aircraftsdata_path, carsdata_path],
-                            batch_size=cfg.batch_size, workers =cfg.workers,
-                            type_="valid" )
-    else:
-        raise ValueError("Unknown Dataset indicator set")
+    validloader, valid_info = loaderObj.getDataLoader(type_= "valid", 
+                    batch_size=cfg.batch_size, workers=cfg.workers,
+                    augument= "DEFAULT")
 
     lutl.LOG2DICTXT(["Train-",train_info], cfg.gLogPath +'/misc.txt')
     lutl.LOG2DICTXT(["Valid-", valid_info], cfg.gLogPath +'/misc.txt')
 
     return trainloader, validloader, len(train_info["Classes"])
+
+
+def getLossSelection():
+    train_loss = valid_loss = nn.CrossEntropyLoss()
+    if cfg.augument == "AUGMIX":
+        train_loss = timm.loss.JsdCrossEntropy(num_splits=3)
+
+    return train_loss, valid_loss
+
 
 
 def simple_main():
@@ -139,7 +119,7 @@ def simple_main():
 
     ### MODEL, OPTIM
     model = ClassifierNet(cfg).cuda(gpu)
-    lossfn = nn.CrossEntropyLoss()
+    lossfn, v_lossfn = getLossSelection()
     optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate,
                         weight_decay=cfg.weight_decay)
     lutl.LOG2TXT(f"Parameters:{rutl.count_train_param(model)}", cfg.gLogPath +'/model-info.txt')
@@ -162,7 +142,7 @@ def simple_main():
     trainMetric = MultiClassMetrics(cfg.gLogPath)
     validMetric = MultiClassMetrics(cfg.gLogPath)
 
-    scaler = torch.cuda.amp.GradScaler() # for mixed precision
+    # scaler = torch.cuda.amp.GradScaler() # for mixed precision
     for epoch in range(start_epoch, cfg.epochs):
 
         ## ---- Training Routine ----
@@ -176,11 +156,11 @@ def simple_main():
                 pred = model.forward(img)
                 loss = lossfn(pred, tgt)
             ## END with
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-            # loss.backward()
-            # optimizer.step()
+            # scaler.scale(loss).backward()
+            # scaler.step(optimizer)
+            # scaler.update()
+            loss.backward()
+            optimizer.step()
             trainMetric.add_entry(torch.argmax(pred, dim=1), tgt, loss)
 
         ## save checkpoint states
@@ -197,7 +177,7 @@ def simple_main():
                 tgt = tgt.to(device, non_blocking=True)
                 # with torch.cuda.amp.autocast():
                 pred = model.forward(img)
-                loss = lossfn(pred, tgt)
+                loss = v_lossfn(pred, tgt)
                 ## END with
                 validMetric.add_entry(torch.argmax(pred, dim=1), tgt, loss)
 

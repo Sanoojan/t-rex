@@ -304,6 +304,9 @@ class SimplifiedLoader():
             data_transform = ClassifyTransforms(infer_flag)
         elif augument == "AUGMIX":
             data_transform = None
+        else:
+            raise ValueError("Unknown augument specified")
+        
 
         if set_name == "air":
             dataset = FGVCAircraft(data_dir=self.aircraftsdata_path, 
@@ -385,7 +388,7 @@ class SimplifiedLoader():
 
 
 ##------------------------------------------------------------------------------
-## Naive Code TODO: Remove
+## Naive Individual Loader TODO: Remove
 
 def getCifar100Loader(folder, batch_size, workers=2, type_ = 'train'):
 
@@ -499,6 +502,10 @@ def getFoodxLoader(folder, batch_size, workers=2, type_ = 'train'):
                 "Transforms": str(data_transform.get_composition()) }
 
     return loader, data_info
+
+
+
+
 
 
 ##========================= DatasetChecking ====================================
