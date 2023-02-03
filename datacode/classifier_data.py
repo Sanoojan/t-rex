@@ -11,6 +11,8 @@ import torchvision.transforms as transforms
 from torchvision.datasets.folder import default_loader as tv_image_loader
 from torch.utils.data import ConcatDataset
 
+import timm.data
+
 ## ===================== Dataset Classes =======================================
 
 class FGVCAircraft(torchvision.datasets.VisionDataset):
@@ -209,15 +211,19 @@ class ClassifyTransforms:
                         interpolation=transforms.InterpolationMode.BICUBIC),
             # transforms.RandomAffine(degrees=(-180, 180), translate=(0.2, 0.2),
             #             interpolation=transforms.InterpolationMode.BICUBIC),
-            transforms.ColorJitter(hue=0.5),
+            transforms.AutoAugment(),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomVerticalFlip(p=0.5),
             transforms.ToTensor(),
+            transforms.Normalize( mean=(0.485, 0.456, 0.406),
+                                  std=(0.229, 0.224, 0.225)),
 
         ])
         infer_transform = transforms.Compose([
             transforms.Resize((self.img_size, self.img_size)),
             transforms.ToTensor(),
+            transforms.Normalize( mean=(0.485, 0.456, 0.406),
+                                  std=(0.229, 0.224, 0.225)),
         ])
 
         self.transform = infer_transform if infer else train_transform
@@ -262,6 +268,125 @@ class DinoTransforms:
 
 ## ===================== Dataloaders Func ======================================
 
+
+class SimplifiedLoader():
+    def __init__(self, set_name) -> None:
+        self.aircraftsdata_path = "/apps/local/shared/CV703/datasets/fgvc-aircraft-2013b/"
+        self.foodxdata_path =  "/apps/local/shared/CV703/datasets/FoodX/food_dataset/"
+        self.carsdata_path =  "/apps/local/shared/CV703/datasets/stanford_cars/"
+        self.set_name = set_name
+
+
+
+    def getDataLoader(self, type_, batch_size=64, workers=2, augument= "DEFAULT"):
+        dataset = self._fetch_dataset(self.set_name, type_, augument)
+
+        if augument == "DEFAULT" or type_ != "train":
+            loader, data_info = self._default_loader_impl(dataset, 
+                                batch_size=batch_size, workers=workers, 
+                                type_= type_)
+        elif augument == "AUGMIX":
+            print("Loading Augmix based loader from timm !.!.!")
+            loader, data_info = self._augmix_loader_impl(dataset, 
+                                batch_size=batch_size, workers=workers, 
+                                splits=3, type_=type_)
+
+        return loader, data_info
+
+
+    def _fetch_dataset(self, set_name, type_, augument):
+
+        infer_flag = False
+        if type_ in ['valid', 'test', 'infer']:
+            infer_flag = True
+
+        if augument == "DEFAULT" or infer_flag:
+            data_transform = ClassifyTransforms(infer_flag)
+        elif augument == "AUGMIX":
+            data_transform = None
+
+        if set_name == "air":
+            dataset = FGVCAircraft(data_dir=self.aircraftsdata_path, 
+                                    mode=type_, transform=data_transform)
+        elif set_name == "car":
+           dataset = StanfordCars(data_dir=self.carsdata_path, 
+                                    mode=type_, transform=data_transform)
+
+        elif set_name == "food":
+           dataset = FoodXDataset(data_dir=self.foodxdata_path, 
+                                    mode=type_, transform=data_transform)
+
+        elif set_name == "air+car":
+            air_dataset = FGVCAircraft(data_dir=self.aircraftsdata_path, mode=type_,
+                            transform=data_transform)
+            car_dataset = StanfordCars(data_dir=self.carsdata_path, mode=type_,
+                            offset_class=len(air_dataset.class_to_idx),
+                            transform=data_transform )
+
+            dataset = ConcatDataset([air_dataset, car_dataset])
+        else:
+            raise ValueError("Unknown Dataset indicator set")
+        
+        return dataset
+        
+
+    def _default_loader_impl(self, dataset, batch_size=64, workers=2, type_ = 'train',):
+        shuffle_flag = True #important
+        if type_ in ['valid', 'test', 'infer']:
+            shuffle_flag = False
+
+        data_info = {"type": type_,
+                    "Classes": dataset.class_to_idx ,
+                    "DatasetSize": dataset.__len__(),
+                    "Transforms": str(dataset) }
+
+        loader = torch.utils.data.DataLoader( dataset,
+            batch_size=batch_size, num_workers=workers, shuffle=shuffle_flag,
+            pin_memory=True)
+
+        return loader, data_info
+
+        
+    def _augmix_loader_impl(self, dataset, batch_size=64, workers=2, 
+                            splits = 3, type_ = "train"):
+        """
+        Reference:[1]https://github.com/rwightman/pytorch-image-models/blob/main/timm/data/loader.py#L189
+                [*2] https://github.com/rwightman/pytorch-image-models/blob/d5aa17e41572ececee0f7829ec1640384532c5d2/timm/data/auto_augment.py#L951
+        """
+        assert type_ == "train",  "AUGMIX can be invoked only for training"
+
+        data_info = {"type": type_,
+                    "Classes": dataset.class_to_idx ,
+                    "DatasetSize": dataset.__len__(),
+                    "Transforms": "AUGMIX" }
+
+        dataset = timm.data.AugMixDataset(dataset, num_splits=splits)
+        loader = timm.data.create_loader(dataset,
+                    input_size=(3, 224, 224),
+                    batch_size=batch_size,
+                    is_training=True,
+                    use_prefetcher=True,
+                    scale=[0.08, 1.0],
+                    ratio=[3./4., 4./3.],
+                    hflip=0.5,
+                    vflip=0.5,
+                    color_jitter=0.8,
+                    auto_augment="rand",  # refer [*2]
+                    num_aug_splits=splits,
+                    interpolation="bilinear",
+                    mean=(0.485, 0.456, 0.406), ##Imagenet
+                    std=(0.229, 0.224, 0.225),  ## Imagenet
+                    num_workers=workers,
+                    collate_fn=None, #FastCollateMixup
+                    pin_memory=True,           )
+
+
+        return loader, data_info
+
+
+##------------------------------------------------------------------------------
+## Naive Code TODO: Remove
+
 def getCifar100Loader(folder, batch_size, workers=2, type_ = 'train'):
 
     if type_ == 'train': trainset = True
@@ -276,10 +401,13 @@ def getCifar100Loader(folder, batch_size, workers=2, type_ = 'train'):
     return loader, cls_idx
 
 
-def getAircraftsLoader(folder, batch_size, workers=2, type_ = 'train'):
+def getAircraftsLoader(folder, batch_size, workers=2, 
+                    type_ = 'train', augmix = False):
+
     infer_flag = False; shuffle_flag = True
     if type_ in ['valid', 'test', 'infer']:
         infer_flag = True; shuffle_flag = False
+    
 
     data_transform = ClassifyTransforms(infer_flag)
     dataset = FGVCAircraft(data_dir=folder, mode=type_,
@@ -384,8 +512,8 @@ def show_loaded_imgs(imgs):
     rows = np.ceil(len(imgs) / 5).astype(int)
     fig = plt.figure(figsize=(10, 7))
     for i, img in enumerate(imgs):
-        img = img.detach()
-        img = tv_to_pil_image(img)
+        img = img.permute(1,2,0).cpu().numpy()
+        img = (img - img.min()) / (img.max()-img.min())
         fig.add_subplot(rows,cols,i+1)
         plt.imshow(img)
         plt.axis('off')
@@ -393,37 +521,38 @@ def show_loaded_imgs(imgs):
 
 if __name__ == "__main__":
 
-    data_transform = transforms.Compose([
-        transforms.Resize((512, 512)),
-        transforms.ToTensor(),
-        ## Avoid using below for visualization
-        # transforms.Normalize(mean=(0.485, 0.456, 0.406),
-        #                     std=(0.229, 0.224, 0.225))
-    ])
-
-    aircraftdata = "/apps/local/shared/CV703/datasets/fgvc-aircraft-2013b"
-    dataset = FGVCAircraft(data_dir=aircraftdata, mode="train",
-                    transform=data_transform)
-    foodxdata =  "/apps/local/shared/CV703/datasets/FoodX/food_dataset"
-    dataset = FoodXDataset(data_dir=foodxdata, mode="train",
-                    transform=data_transform)
-
-    carsdata =  "/apps/local/shared/CV703/datasets/stanford_cars"
-    dataset = StanfordCars(data_dir=carsdata, mode="valid",
-                    transform=data_transform)
+    aircraftsdata_path = "/apps/local/shared/CV703/datasets/fgvc-aircraft-2013b/"
+    foodxdata_path =  "/apps/local/shared/CV703/datasets/FoodX/food_dataset/"
+    carsdata_path =  "/apps/local/shared/CV703/datasets/stanford_cars/"
 
 
-    dataloader,_ = getAircraftsAndCarsLoader([aircraftdata, carsdata],
-                    batch_size=1, type_="train")
+    # dataloader,_ = getAircraftsAndCarsLoader([aircraftsdata_path, carsdata_path],
+                    # batch_size=2, type_="train")
+    
+    # dataloader,_ = getCarsLoader( carsdata_path, batch_size=2, type_="valid")
 
+    dataloader, _ = SimplifiedLoader("air").getDataLoader(type_= "valid", 
+                    batch_size=2, workers=2, augument= "AUGMIX")
+
+
+    ## -------------------- Plotting Loop---------------------------------------
+    count = 5  ## SET THIS
     imgs = []; tgts = []
-    ridx  = np.random.choice(len(dataset), 15)
-    for i in ridx:
+
+    # ridx  = np.random.choice(len(dataset), count)
+    # for i in ridx:
         # img, tgt =  dataset.__getitem__(i)
-        img, tgt =  next(iter(dataloader)) ## ridx will be ignored
-        img = img.squeeze()
-        imgs.append(img)
-        tgts.append(tgt)
+        # imgs.append(img)
+        # tgts.append(tgt)
+
+    iter_dataloader = iter(dataloader)
+    for i in range(count):    
+        img, tgt =  next(iter_dataloader) ## ridx will be ignored
+        print(img.min(), img.max())
+        img_ = [ img[i].squeeze() for i in range(img.shape[0]) ]
+        tgt_ = [ tgt[i].squeeze() for i in range(tgt.shape[0]) ]
+        imgs.extend(img_)
+        tgts.extend(tgt_)
 
     show_loaded_imgs(imgs)
 
