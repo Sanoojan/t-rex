@@ -22,6 +22,7 @@ import utilities.logUtils as lutl
 from utilities.metricUtils import MultiClassMetrics
 from algorithms.resnet import ClassifierNet
 import datacode.classifier_data as ClsData
+from algorithms.visiontransformer import vit_small_patch16_224
 
 
 print(f"Pytorch version: {torch.__version__}")
@@ -31,15 +32,37 @@ print("Device Used:", device)
 
 ###============================= Configure and Setup ===========================
 
+# #for ResNet
+# cfg = rutl.ObjDict(
+# dataset = "air", # "air+car", "food", "car"
+# balance_class = False, #to be implemented
+
+# epochs= 1000,
+# batch_size= 64,
+# workers= 4,
+# learning_rate= 1e-4,
+# weight_decay= 1e-6,
+
+# feature_extract = "resnet50", # "resnet34/50/101"
+# featx_pretrain = "DEFAULT",  # path-to-weights or None or DEFAULT-->imagenet
+# featx_dropout = 0.0,
+# classifier = [1024,], #First & Last MLPs will be set in code based on class out of dataset and FeatureExtractor
+# clsfy_dropout = 0.5,
+
+# checkpoint_dir= "hypotheses/res50-air/",
+# restart_training=False
+# )
+
+#for ViT
 cfg = rutl.ObjDict(
-dataset = "air", # "air+car", "food", "car"
+dataset = "food", # "air+car", "food", ## "car"
 balance_class = False, #to be implemented
 
 epochs= 1000,
-batch_size= 64,
+batch_size= 100,
 workers= 4,
-learning_rate= 1e-4,
-weight_decay= 1e-6,
+learning_rate= 5e-5,
+weight_decay= 0.001,
 
 feature_extract = "resnet50", # "resnet34/50/101"
 featx_pretrain = "DEFAULT",  # path-to-weights or None or DEFAULT-->imagenet
@@ -47,8 +70,8 @@ featx_dropout = 0.0,
 classifier = [1024,], #First & Last MLPs will be set in code based on class out of dataset and FeatureExtractor
 clsfy_dropout = 0.5,
 
-checkpoint_dir= "hypotheses/res50-air/",
-restart_training=False
+checkpoint_dir= "hypotheses/vit_small-food/",
+restart_training=True
 )
 
 ### -----
@@ -70,9 +93,9 @@ cfg.gWeightPath = cfg.checkpoint_dir + '/weights/'
 
 
 def getDatasetSelection():
-    aircraftsdata_path = "/apps/local/shared/CV703/datasets/fgvc-aircraft-2013b/"
-    foodxdata_path =  "/apps/local/shared/CV703/datasets/FoodX/food_dataset/"
-    carsdata_path =  "/apps/local/shared/CV703/datasets/stanford_cars/"
+    aircraftsdata_path = "/nfs/users/ext_sanoojan.baliah/Sanoojan/data/fgvc-aircraft-2013b/"
+    foodxdata_path =  "/nfs/users/ext_sanoojan.baliah/Sanoojan/data/FoodX/food_dataset/"
+    carsdata_path =  "/nfs/users/ext_sanoojan.baliah/Sanoojan/data/stanford_cars/"
 
     if cfg.dataset == "air":
         trainloader, train_info = ClsData.getAircraftsLoader( aircraftsdata_path,
@@ -136,7 +159,14 @@ def simple_main():
     cfg.classifier.append(class_size) #Adding last layer of MLP
 
     ### MODEL, OPTIM
-    model = ClassifierNet(cfg).cuda(gpu)
+
+    #Resnet model
+    # model = ClassifierNet(cfg).cuda(gpu)
+    # device=
+
+    model=vit_small_patch16_224(pretrained=True)
+    model.head = nn.Linear(384, class_size)
+    model=model.to(device)
     lossfn = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate,
                         weight_decay=cfg.weight_decay)
@@ -155,30 +185,32 @@ def simple_main():
 
 
     ### MODEL TRAINING
+    
     start_time = time.time()
     best_acc = 0 ; best_loss = float('inf')
     trainMetric = MultiClassMetrics(cfg.gLogPath)
     validMetric = MultiClassMetrics(cfg.gLogPath)
 
-    scaler = torch.cuda.amp.GradScaler() # for mixed precision
+    # scaler = torch.cuda.amp.GradScaler() # for mixed precision
     for epoch in range(start_epoch, cfg.epochs):
 
         ## ---- Training Routine ----
         model.train()
+        
         for img, tgt in tqdm(trainloader):
             img = img.to(device, non_blocking=True)
             tgt = tgt.to(device, non_blocking=True)
             optimizer.zero_grad()
             ## with mixed precision
-            with torch.cuda.amp.autocast():
-                pred = model.forward(img)
-                loss = lossfn(pred, tgt)
+            # with torch.cuda.amp.autocast():
+            pred = model.forward(img)
+            loss = lossfn(pred, tgt)
             ## END with
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-            # loss.backward()
-            # optimizer.step()
+            # scaler.scale(loss).backward()
+            # scaler.step(optimizer)
+            # scaler.update()
+            loss.backward()
+            optimizer.step()
             trainMetric.add_entry(torch.argmax(pred, dim=1), tgt, loss)
 
         ## save checkpoint states

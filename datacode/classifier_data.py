@@ -401,14 +401,14 @@ if __name__ == "__main__":
         #                     std=(0.229, 0.224, 0.225))
     ])
 
-    aircraftdata = "/apps/local/shared/CV703/datasets/fgvc-aircraft-2013b"
+    aircraftdata = "/nfs/users/ext_sanoojan.baliah/Sanoojan/data/fgvc-aircraft-2013b"
     dataset = FGVCAircraft(data_dir=aircraftdata, mode="train",
                     transform=data_transform)
-    foodxdata =  "/apps/local/shared/CV703/datasets/FoodX/food_dataset"
+    foodxdata =  "/nfs/users/ext_sanoojan.baliah/Sanoojan/data/FoodX/food_dataset"
     dataset = FoodXDataset(data_dir=foodxdata, mode="train",
                     transform=data_transform)
 
-    carsdata =  "/apps/local/shared/CV703/datasets/stanford_cars"
+    carsdata =  "/nfs/users/ext_sanoojan.baliah/Sanoojan/data/stanford_cars"
     dataset = StanfordCars(data_dir=carsdata, mode="valid",
                     transform=data_transform)
 
