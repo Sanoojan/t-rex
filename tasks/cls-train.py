@@ -74,11 +74,11 @@ cfg.gWeightPath = cfg.checkpoint_dir + '/weights/'
 def getDatasetSelection():
 
     loaderObj = SimplifiedLoader("air")
-    trainloader, train_info = loaderObj.getDataLoader(type_= "train", 
+    trainloader, train_info = loaderObj.get_data_loader(type_= "train", 
                     batch_size=cfg.batch_size, workers=cfg.workers, 
                     augument= cfg.augument)
 
-    validloader, valid_info = loaderObj.getDataLoader(type_= "valid", 
+    validloader, valid_info = loaderObj.get_data_loader(type_= "valid", 
                     batch_size=cfg.batch_size, workers=cfg.workers,
                     augument= "DEFAULT")
 

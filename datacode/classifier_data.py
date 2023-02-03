@@ -278,7 +278,7 @@ class SimplifiedLoader():
 
 
 
-    def getDataLoader(self, type_, batch_size=64, workers=2, augument= "DEFAULT"):
+    def get_data_loader(self, type_, batch_size=64, workers=2, augument= "DEFAULT"):
         dataset = self._fetch_dataset(self.set_name, type_, augument)
 
         if augument == "DEFAULT" or type_ != "train":
@@ -341,7 +341,7 @@ class SimplifiedLoader():
         data_info = {"type": type_,
                     "Classes": dataset.class_to_idx ,
                     "DatasetSize": dataset.__len__(),
-                    "Transforms": str(dataset) }
+                    "Transforms": str(dataset.transforms.get_composition) }
 
         loader = torch.utils.data.DataLoader( dataset,
             batch_size=batch_size, num_workers=workers, shuffle=shuffle_flag,
