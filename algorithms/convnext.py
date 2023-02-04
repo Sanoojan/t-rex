@@ -221,7 +221,7 @@ class ClassifierNet(nn.Module):
         layers = []
         for i in range(len(sizes) - 2):
             layers.append(nn.Linear(sizes[i], sizes[i + 1], bias=False))
-            layers.append(nn.BatchNorm1d(sizes[i + 1]))
+            layers.append(nn.LayerNorm(sizes[i + 1]))
             layers.append(nn.ReLU(inplace=True))
             layers.append(nn.Dropout(p=self.args.clsfy_dropout))
         layers.append(nn.Linear(sizes[-2], sizes[-1], bias=False))
@@ -262,6 +262,11 @@ class ClassifierNet(nn.Module):
             backbone = convnext_base(pretrained=pretrain, in_22k=imgnet22k,
                                         num_classes = head_default)
             outfeat_size = 1024
+
+        elif self.args.feature_extract == 'convnext-large':
+            backbone = convnext_base(pretrained=pretrain, in_22k=imgnet22k,
+                                        num_classes = head_default)
+            outfeat_size = 1536
 
         backbone.head = nn.Identity() #remove fc of default arc
 
