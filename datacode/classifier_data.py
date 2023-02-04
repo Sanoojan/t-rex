@@ -282,13 +282,13 @@ class SimplifiedLoader():
         dataset = self._fetch_dataset(self.set_name, type_, augument)
 
         if augument == "DEFAULT" or type_ != "train":
-            loader, data_info = self._default_loader_impl(dataset, 
-                                batch_size=batch_size, workers=workers, 
+            loader, data_info = self._default_loader_impl(dataset,
+                                batch_size=batch_size, workers=workers,
                                 type_= type_)
         elif augument == "AUGMIX":
             print("Loading Augmix based loader from timm !.!.!")
-            loader, data_info = self._augmix_loader_impl(dataset, 
-                                batch_size=batch_size, workers=workers, 
+            loader, data_info = self._augmix_loader_impl(dataset,
+                                batch_size=batch_size, workers=workers,
                                 splits=3, type_=type_)
 
         return loader, data_info
@@ -306,17 +306,17 @@ class SimplifiedLoader():
             data_transform = None
         else:
             raise ValueError("Unknown augument specified")
-        
+
 
         if set_name == "air":
-            dataset = FGVCAircraft(data_dir=self.aircraftsdata_path, 
+            dataset = FGVCAircraft(data_dir=self.aircraftsdata_path,
                                     mode=type_, transform=data_transform)
         elif set_name == "car":
-           dataset = StanfordCars(data_dir=self.carsdata_path, 
+           dataset = StanfordCars(data_dir=self.carsdata_path,
                                     mode=type_, transform=data_transform)
 
         elif set_name == "food":
-           dataset = FoodXDataset(data_dir=self.foodxdata_path, 
+           dataset = FoodXDataset(data_dir=self.foodxdata_path,
                                     mode=type_, transform=data_transform)
 
         elif set_name == "air+car":
@@ -327,11 +327,14 @@ class SimplifiedLoader():
                             transform=data_transform )
 
             dataset = ConcatDataset([air_dataset, car_dataset])
+            dataset.class_to_idx = dict(list(air_dataset.class_to_idx.items()) +  \
+                    list(car_dataset.class_to_idx.items())) #union operation
+            dataset.transform = data_transform
         else:
             raise ValueError("Unknown Dataset indicator set")
-        
+
         return dataset
-        
+
 
     def _default_loader_impl(self, dataset, batch_size=64, workers=2, type_ = 'train',):
         shuffle_flag = True #important
@@ -340,8 +343,10 @@ class SimplifiedLoader():
 
         data_info = {"type": type_,
                     "Classes": dataset.class_to_idx ,
+                    "ClassesSize": len(dataset.class_to_idx) ,
                     "DatasetSize": dataset.__len__(),
-                    "Transforms": str(dataset.transforms.get_composition) }
+                    "Transforms": "DEFAULT"#str(dataset.transform)
+                    }
 
         loader = torch.utils.data.DataLoader( dataset,
             batch_size=batch_size, num_workers=workers, shuffle=shuffle_flag,
@@ -349,9 +354,10 @@ class SimplifiedLoader():
 
         return loader, data_info
 
-        
-    def _augmix_loader_impl(self, dataset, batch_size=64, workers=2, 
+
+    def _augmix_loader_impl(self, dataset, batch_size=64, workers=2,
                             splits = 3, type_ = "train"):
+        ## TODO: figure out and Fix issue with concat dataset
         """
         Reference:[1]https://github.com/rwightman/pytorch-image-models/blob/main/timm/data/loader.py#L189
                 [*2] https://github.com/rwightman/pytorch-image-models/blob/d5aa17e41572ececee0f7829ec1640384532c5d2/timm/data/auto_augment.py#L951
@@ -360,6 +366,7 @@ class SimplifiedLoader():
 
         data_info = {"type": type_,
                     "Classes": dataset.class_to_idx ,
+                    "ClassesSize": len(dataset.class_to_idx) ,
                     "DatasetSize": dataset.__len__(),
                     "Transforms": "AUGMIX" }
 
@@ -404,13 +411,13 @@ def getCifar100Loader(folder, batch_size, workers=2, type_ = 'train'):
     return loader, cls_idx
 
 
-def getAircraftsLoader(folder, batch_size, workers=2, 
+def getAircraftsLoader(folder, batch_size, workers=2,
                     type_ = 'train', augmix = False):
 
     infer_flag = False; shuffle_flag = True
     if type_ in ['valid', 'test', 'infer']:
         infer_flag = True; shuffle_flag = False
-    
+
 
     data_transform = ClassifyTransforms(infer_flag)
     dataset = FGVCAircraft(data_dir=folder, mode=type_,
@@ -535,10 +542,10 @@ if __name__ == "__main__":
 
     # dataloader,_ = getAircraftsAndCarsLoader([aircraftsdata_path, carsdata_path],
                     # batch_size=2, type_="train")
-    
+
     # dataloader,_ = getCarsLoader( carsdata_path, batch_size=2, type_="valid")
 
-    dataloader, _ = SimplifiedLoader("air").getDataLoader(type_= "valid", 
+    dataloader, _ = SimplifiedLoader("air").getDataLoader(type_= "valid",
                     batch_size=2, workers=2, augument= "AUGMIX")
 
 
@@ -553,7 +560,7 @@ if __name__ == "__main__":
         # tgts.append(tgt)
 
     iter_dataloader = iter(dataloader)
-    for i in range(count):    
+    for i in range(count):
         img, tgt =  next(iter_dataloader) ## ridx will be ignored
         print(img.min(), img.max())
         img_ = [ img[i].squeeze() for i in range(img.shape[0]) ]

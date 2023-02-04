@@ -73,17 +73,17 @@ cfg.gWeightPath = cfg.checkpoint_dir + '/weights/'
 
 def getDatasetSelection():
 
-    loaderObj = SimplifiedLoader("air")
-    trainloader, train_info = loaderObj.get_data_loader(type_= "train", 
-                    batch_size=cfg.batch_size, workers=cfg.workers, 
+    loaderObj = SimplifiedLoader(cfg.dataset)
+    trainloader, train_info = loaderObj.get_data_loader(type_= "train",
+                    batch_size=cfg.batch_size, workers=cfg.workers,
                     augument= cfg.augument)
 
-    validloader, valid_info = loaderObj.get_data_loader(type_= "valid", 
+    validloader, valid_info = loaderObj.get_data_loader(type_= "valid",
                     batch_size=cfg.batch_size, workers=cfg.workers,
                     augument= "DEFAULT")
 
-    lutl.LOG2DICTXT(["Train-",train_info], cfg.gLogPath +'/misc.txt')
-    lutl.LOG2DICTXT(["Valid-", valid_info], cfg.gLogPath +'/misc.txt')
+    lutl.LOG2DICTXT({"Train-":train_info}, cfg.gLogPath +'/misc.txt')
+    lutl.LOG2DICTXT({"Valid-": valid_info}, cfg.gLogPath +'/misc.txt')
 
     return trainloader, validloader, len(train_info["Classes"])
 

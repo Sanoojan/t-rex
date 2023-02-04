@@ -1,5 +1,6 @@
 import json
 import csv
+import pprint
 
 def LOG2CSV(datalist, csv_file, flag = 'a'):
     '''
@@ -26,6 +27,6 @@ def LOG2DICTXT(dic, file_path, flag = 'a', console= True):
     '''
     with open(file_path, 'a', buffering=1) as txt_file:
         if console: print(json.dumps(dic))
-        print(json.dumps(dic), file=txt_file)
+        pprint.pprint(json.dumps(dic), txt_file)
 
 

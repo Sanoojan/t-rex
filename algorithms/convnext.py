@@ -281,5 +281,5 @@ if __name__ == "__main__":
 
     from torchsummary import summary
 
-    model = convnext_base()
+    model = convnext_large()
     summary(model, (3, 224, 224))
