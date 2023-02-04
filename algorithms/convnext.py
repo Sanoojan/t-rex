@@ -264,7 +264,7 @@ class ClassifierNet(nn.Module):
             outfeat_size = 1024
 
         elif self.args.feature_extract == 'convnext-large':
-            backbone = convnext_base(pretrained=pretrain, in_22k=imgnet22k,
+            backbone = convnext_large(pretrained=pretrain, in_22k=imgnet22k,
                                         num_classes = head_default)
             outfeat_size = 1536
 
