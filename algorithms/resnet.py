@@ -43,8 +43,14 @@ class ClassifierNet(nn.Module):
 
     def _load_resnet_backbone(self):
 
-        torch_pretrain = "DEFAULT" if self.args.featx_pretrain == "DEFAULT" else None
+        ## pretrain setting
+        torch_pretrain = None
+        if self.args.featx_pretrain in ["DEFAULT", "IMGNET-1K"]:
+            torch_pretrain = "DEFAULT"
+        elif self.args.featx_pretrain not in [None, "NONE", "none"]:
+            raise ValueError("Unknown pretrain weight type requested ", self.args.featx_pretrain )
 
+        ## Model loading
         if self.args.feature_extract == 'resnet18':
             backbone = torchvision.models.resnet18(zero_init_residual=True,
                                  weights=torch_pretrain)

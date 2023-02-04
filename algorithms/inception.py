@@ -44,11 +44,15 @@ class ClassifierNet(nn.Module):
 
     def _load_inception_backbone(self):
 
-        torch_pretrain = True if self.args.featx_pretrain == "DEFAULT" else None
+        pretrain = False
+        if self.args.featx_pretrain in ["DEFAULT", "IMGNET-1K"]:
+            pretrain = True
+        elif self.args.featx_pretrain not in [None, "NONE", "none"]:
+            raise ValueError("Unknown pretrain weight type requested ", self.args.featx_pretrain )
 
         if self.args.feature_extract == 'inceptv4':
             backbone = model = timm.create_model('inception_v4',
-                                pretrained=True)
+                                pretrained=pretrain)
             outfeat_size = 1536
         else:
             raise ValueError(f"Unknown Model Implementation called in {os.path.basename(__file__)}")

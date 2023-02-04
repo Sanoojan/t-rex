@@ -237,16 +237,19 @@ class ClassifierNet(nn.Module):
 
     def _load_convnext_backbone(self):
 
+        ## pretrain setting
         pretrain = False; imgnet22k = False
         head_default = None
-        if self.args.featx_pretrain == "DEFAULT":
+        if self.args.featx_pretrain in ["DEFAULT", "IMGNET-1K"]:
             pretrain = True
             head_default = 1000
-        elif self.args.featx_pretrain == "IMGNET22k":
+        elif self.args.featx_pretrain == "IMGNET-22K":
             pretrain = True; imgnet22k = True
             head_default = 21841
+        elif self.args.featx_pretrain not in [None, "NONE", "none"]:
+            raise ValueError("Unknown pretrain weight type requested ", self.args.featx_pretrain )
 
-
+        ## Model loading
         if self.args.feature_extract == 'convnext-tiny':
             backbone = convnext_tiny(pretrained=pretrain, in_22k=imgnet22k,
                                         num_classes = head_default)
