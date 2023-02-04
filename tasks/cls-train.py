@@ -21,6 +21,8 @@ from utilities.metricUtils import MultiClassMetrics
 
 # from algorithms.resnet import ClassifierNet
 from algorithms.convnext import ClassifierNet
+# from algorithms.inception import ClassifierNet
+
 
 from datacode.classifier_data import SimplifiedLoader
 
@@ -72,11 +74,14 @@ cfg.gWeightPath = cfg.checkpoint_dir + '/weights/'
 
 
 def getDatasetSelection():
+    if cfg.augument == "AUGMIX":
+        raise ValueError("Current head is purged of AUGMIX implementation of timm repo; For Our Saneness")
+
 
     loaderObj = SimplifiedLoader(cfg.dataset)
     trainloader, train_info = loaderObj.get_data_loader(type_= "train",
                     batch_size=cfg.batch_size, workers=cfg.workers,
-                    augument= cfg.augument)
+                    augument= "DEFAULT")
 
     validloader, valid_info = loaderObj.get_data_loader(type_= "valid",
                     batch_size=cfg.batch_size, workers=cfg.workers,
@@ -190,7 +195,7 @@ def simple_main():
         lutl.LOG2DICTXT(stats, cfg.gLogPath+'/train-stats.txt')
 
 
-        ## save best model #NOTE: Set model object based on architecture
+        ## save best model # TODO: add direct model saving
         best_flag = False
         if stats['validacc'] > best_acc:
             torch.save(model.state_dict(), cfg.gWeightPath +'/bestmodel.pth')

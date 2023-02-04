@@ -1,6 +1,4 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# This source code is licensed under the MIT license
-# Taken From: https://github.com/facebookresearch/ConvNeXt/blob/main/models/convnext.py
+# ConvNext Taken From: https://github.com/facebookresearch/ConvNeXt/blob/main/models/convnext.py
 
 import os, sys, time
 
@@ -221,7 +219,7 @@ class ClassifierNet(nn.Module):
         layers = []
         for i in range(len(sizes) - 2):
             layers.append(nn.Linear(sizes[i], sizes[i + 1], bias=False))
-            layers.append(nn.LayerNorm(sizes[i + 1]))
+            layers.append(nn.LayerNorm(sizes[i + 1]))  #watchout this is LayerNorm
             layers.append(nn.ReLU(inplace=True))
             layers.append(nn.Dropout(p=self.args.clsfy_dropout))
         layers.append(nn.Linear(sizes[-2], sizes[-1], bias=False))
@@ -267,6 +265,9 @@ class ClassifierNet(nn.Module):
             backbone = convnext_large(pretrained=pretrain, in_22k=imgnet22k,
                                         num_classes = head_default)
             outfeat_size = 1536
+
+        else:
+            raise ValueError(f"Unknown Model Implementation called in {os.path.basename(__file__)}")
 
         backbone.head = nn.Identity() #remove fc of default arc
 
