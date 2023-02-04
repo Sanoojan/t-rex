@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from timm.models.layers import trunc_normal_, DropPath
 from timm.models.registry import register_model
 
+sys.path.append(os.getcwd())
 import utilities.runUtils as rutl
 
 
@@ -257,6 +258,11 @@ class ClassifierNet(nn.Module):
                                         num_classes = head_default)
             outfeat_size = 768
 
+        elif self.args.feature_extract == 'convnext-base':
+            backbone = convnext_base(pretrained=pretrain, in_22k=imgnet22k,
+                                        num_classes = head_default)
+            outfeat_size = 1024
+
         backbone.head = nn.Identity() #remove fc of default arc
 
         # pretrain from external file
@@ -275,5 +281,5 @@ if __name__ == "__main__":
 
     from torchsummary import summary
 
-    model = convnext_small()
+    model = convnext_base()
     summary(model, (3, 224, 224))
