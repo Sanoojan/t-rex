@@ -58,19 +58,20 @@ class BarlowWrapnet(nn.Module):
 
 ## Loss func
 
-CE_loss = nn.CrossEntropyLoss() 
+CE_loss = nn.CrossEntropyLoss()
 def lossCEwithBT(pred1, pred2, ccorr, tgt):
 
     lambd = 0.0051
-
-    on_diag = torch.diagonal(ccorr).add_(-1).pow_(2).sum()
-    off_diag = off_diagonal(ccorr).pow_(2).sum()
+    # JGB version of Loss function with mean
+    on_diag = torch.diagonal(ccorr).add_(-1).pow_(2).mean() #.sum()
+    off_diag = off_diagonal(ccorr).pow_(2).mean() #.sum()
     btloss = on_diag + lambd * off_diag
 
     ce1 = CE_loss(pred1, tgt)
     ce2 = CE_loss(pred2, tgt)
 
-    return ce1 + ce2 + btloss
+    loss = ce1 + ce2 + btloss
+    return loss
 
 def off_diagonal(x):
     # return a flattened view of the off-diagonal elements of a square matrix
