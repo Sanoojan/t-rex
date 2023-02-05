@@ -43,9 +43,10 @@ batch_size= 64,
 workers= 4,
 learning_rate= 1e-4,
 weight_decay= 1e-6,
-augument= "DEFAULT", #DEFAULT or AUGMIX
+stratergy = "DEFAULT", #DEFAULT or AUGMIX or BARLOW
+# augument= "DEFAULT", #
 
-feature_extract = "resnet50", # "resnet34/50/101"
+feature_extract = "resnet50", # "resnet34/50/101" "convnext-tiny/small/base"
 featx_pretrain = "DEFAULT",  # path-to-weights or None or DEFAULT-->imagenet
 featx_dropout = 0.0,
 classifier = [1024,], #First & Last MLPs will be set in code based on class out of dataset and FeatureExtractor
@@ -72,20 +73,24 @@ cfg.gWeightPath = cfg.checkpoint_dir + '/weights/'
 
 ### ============================================================================
 
+## Checks and Balances
+if cfg.stratergy == "AUGMIX":
+    raise ValueError("""Current head is stopped from AUGMIX implementation of timm repo; 
+                        For Our Saneness of assignment !! You can bypass at your discretion""")
+if cfg.stratergy == "BARLOW":
+    raise ValueError("Please use train file specific to BarlowTwin Style training, not me !!")
+##------
 
 def getDatasetSelection():
-    if cfg.augument == "AUGMIX":
-        raise ValueError("Current head is purged of AUGMIX implementation of timm repo; For Our Saneness")
-
 
     loaderObj = SimplifiedLoader(cfg.dataset)
     trainloader, train_info = loaderObj.get_data_loader(type_= "train",
                     batch_size=cfg.batch_size, workers=cfg.workers,
-                    augument= "DEFAULT")
+                    augument= cfg.stratergy)
 
     validloader, valid_info = loaderObj.get_data_loader(type_= "valid",
                     batch_size=cfg.batch_size, workers=cfg.workers,
-                    augument= "DEFAULT")
+                    augument= "INFER")
 
     lutl.LOG2DICTXT({"Train-":train_info}, cfg.gLogPath +'/misc.txt')
     lutl.LOG2DICTXT({"Valid-": valid_info}, cfg.gLogPath +'/misc.txt')
@@ -95,7 +100,7 @@ def getDatasetSelection():
 
 def getLossSelection():
     train_loss = valid_loss = nn.CrossEntropyLoss()
-    if cfg.augument == "AUGMIX":
+    if cfg.stratergy == "AUGMIX":
         train_loss = timm.loss.JsdCrossEntropy(num_splits=3)
 
     return train_loss, valid_loss
@@ -211,6 +216,7 @@ def simple_main():
 
         trainMetric.reset()
         validMetric.reset(best_flag)
+
 
 if __name__ == '__main__':
     simple_main()
