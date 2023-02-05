@@ -1,4 +1,4 @@
-# ConvNext Taken From: https://github.com/facebookresearch/ConvNeXt/blob/main/models/convnext.py
+
 
 import os, sys, time
 
@@ -11,6 +11,8 @@ from timm.models.registry import register_model
 sys.path.append(os.getcwd())
 import utilities.runUtils as rutl
 
+##------------------------------------------------------------------------------
+# ConvNext Taken From: https://github.com/facebookresearch/ConvNeXt/blob/main/models/convnext.py
 
 class Block(nn.Module):
     r""" ConvNeXt Block. There are two equivalent implementations:
@@ -211,11 +213,11 @@ class ClassifierNet(nn.Module):
         self.args = args
 
         # Feature Extractor
-        self.backbone, out_size = self._load_convnext_backbone()
+        self.backbone, self.feat_outsize = self._load_convnext_backbone()
         self.feat_dropout = nn.Dropout(p=self.args.featx_dropout)
 
         # Classifier
-        sizes = [out_size] + list(args.classifier)
+        sizes = [self.feat_outsize] + list(args.classifier)
         layers = []
         for i in range(len(sizes) - 2):
             layers.append(nn.Linear(sizes[i], sizes[i + 1], bias=False))
@@ -247,7 +249,7 @@ class ClassifierNet(nn.Module):
             pretrain = True; imgnet22k = True
             head_default = 21841
         elif self.args.featx_pretrain not in [None, "NONE", "none"]:
-            raise ValueError("Unknown pretrain weight type requested ", self.args.featx_pretrain )
+            raise ValueError(f"Unknown pretrain weight type requested {self.args.featx_pretrain}" )
 
         ## Model loading
         if self.args.feature_extract == 'convnext-tiny':

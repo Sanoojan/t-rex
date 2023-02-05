@@ -1,4 +1,4 @@
-""" Classifier Network trainig
+""" Classifier Network training with Barlow twin Correlation on features
 """
 
 import os, sys, time
@@ -22,6 +22,7 @@ from utilities.metricUtils import MultiClassMetrics
 # from algorithms.resnet import ClassifierNet
 from algorithms.convnext import ClassifierNet
 # from algorithms.inception import ClassifierNet
+from algorithms.barlowtwin import BarlowWrapnet, lossCEwithBT
 
 
 from datacode.classifier_data import SimplifiedLoader
@@ -43,17 +44,19 @@ batch_size= 64,
 workers= 4,
 learning_rate= 1e-4,
 weight_decay= 1e-6,
-stratergy = "DEFAULT", #DEFAULT or AUGMIX or BARLOW
+stratergy = "BARLOW", #DEFAULT or AUGMIX or BARLOW
 # augument= "DEFAULT", #
 
-feature_extract = "resnet50", # "resnet34/50/101" "convnext-tiny/small/base"
-featx_pretrain = "DEFAULT",  # path-to-weights or None or DEFAULT-->imagenet
-featx_dropout = 0.0,
-classifier = [1024,], #First & Last MLPs will be set in code based on class out of dataset and FeatureExtractor
+feature_extract = "convnext-base", #"convnext-tiny/small/base"
+featx_pretrain = "IMGNET-22K",  # path-to-weights or None or DEFAULT-->imagenet
+featx_dropout = 0.1,
+classifier = [512,], #First & Last MLPs will be set in code based on class out of dataset and FeatureExtractor
 clsfy_dropout = 0.5,
 
+barlow_projector = [4096, 4096, 4096],
+
 checkpoint_dir= "hypotheses/res50-air/",
-restart_training=False
+restart_training=False,
 )
 
 ### -----
@@ -74,11 +77,8 @@ cfg.gWeightPath = cfg.checkpoint_dir + '/weights/'
 ### ============================================================================
 
 ## Checks and Balances
-if cfg.stratergy == "AUGMIX":
-    raise ValueError("""Current head is stopped from AUGMIX implementation of timm repo; 
-                        For Our Saneness of assignment !! You can bypass at your discretion""")
-if cfg.stratergy == "BARLOW":
-    raise ValueError("Please use train file specific to BarlowTwin Style training, not me !!")
+if cfg.stratergy != "BARLOW":
+    raise ValueError("This train file only supports Barlow based training use differnt file other usage")
 ##------
 
 def getDatasetSelection():
@@ -99,9 +99,8 @@ def getDatasetSelection():
 
 
 def getLossSelection():
-    train_loss = valid_loss = nn.CrossEntropyLoss()
-    if cfg.stratergy == "AUGMIX":
-        train_loss = timm.loss.JsdCrossEntropy(num_splits=3)
+    valid_loss = nn.CrossEntropyLoss()
+    train_loss = lossCEwithBT
 
     return train_loss, valid_loss
 
@@ -128,7 +127,9 @@ def simple_main():
     cfg.classifier.append(class_size) #Adding last layer of MLP
 
     ### MODEL, OPTIM
-    model = ClassifierNet(cfg).cuda(gpu)
+    basemodel = ClassifierNet(cfg).cuda(gpu)
+    model = BarlowWrapnet(cfg, basemodel).cuda(gpu)
+
     lossfn, v_lossfn = getLossSelection()
     optimizer = optim.AdamW(model.parameters(), lr=cfg.learning_rate,
                         weight_decay=cfg.weight_decay)
@@ -157,21 +158,23 @@ def simple_main():
 
         ## ---- Training Routine ----
         model.train()
-        for img, tgt in tqdm(trainloader):
-            img = img.to(device, non_blocking=True)
+        for (img1, img2), tgt in tqdm(trainloader):
+            img1 = img1.to(device, non_blocking=True)
+            img2 = img2.to(device, non_blocking=True)
             tgt = tgt.to(device, non_blocking=True)
+            
             optimizer.zero_grad()
             ## with mixed precision
-            with torch.cuda.amp.autocast():
-                pred = model.forward(img)
-                loss = lossfn(pred, tgt)
+            # with torch.cuda.amp.autocast():
+            p1, p2, cr = model.forward_barlow(img1, img2)
+            loss = lossfn(p1, p2, cr, tgt)
             ## END with
             # scaler.scale(loss).backward()
             # scaler.step(optimizer)
             # scaler.update()
             loss.backward()
             optimizer.step()
-            trainMetric.add_entry(torch.argmax(pred, dim=1), tgt, loss)
+            trainMetric.add_entry(torch.argmax((p1+p2)/2, dim=1), tgt, loss)
 
         ## save checkpoint states
         state = dict(epoch=epoch + 1, model=model.state_dict(),
@@ -186,7 +189,7 @@ def simple_main():
                 img = img.to(device, non_blocking=True)
                 tgt = tgt.to(device, non_blocking=True)
                 # with torch.cuda.amp.autocast():
-                pred = model.forward(img)
+                pred = basemodel.forward(img)  ## or pred, _ = model.forward(img)
                 loss = v_lossfn(pred, tgt)
                 ## END with
                 validMetric.add_entry(torch.argmax(pred, dim=1), tgt, loss)

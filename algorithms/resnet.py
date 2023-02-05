@@ -17,11 +17,11 @@ class ClassifierNet(nn.Module):
         self.args = args
 
         # Feature Extractor
-        self.backbone, out_size = self._load_resnet_backbone()
+        self.backbone, self.feat_outsize = self._load_resnet_backbone()
         self.feat_dropout = nn.Dropout(p=self.args.featx_dropout)
 
         # Classifier
-        sizes = [out_size] + list(args.classifier)
+        sizes = [self.feat_outsize] + list(args.classifier)
         layers = []
         for i in range(len(sizes) - 2):
             layers.append(nn.Linear(sizes[i], sizes[i + 1], bias=False))
