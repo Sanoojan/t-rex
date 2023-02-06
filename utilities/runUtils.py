@@ -16,7 +16,7 @@ def START_SEED(seed=73):
 
 ##========================== WEIGTHS ===========================================
 
-def load_pretrained(model, weight_path, flexible = False):
+def load_pretrained(model, weight_path, flexible = False, purge_func = None):
     if not weight_path:
         print("No weight file to be loaded returning Model with Random weights")
         return model
